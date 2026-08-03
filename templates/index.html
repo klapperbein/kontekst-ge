@@ -115,6 +115,18 @@
             transform: scale(0.98);
         }
 
+        .secondary-btn {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            margin-top: 8px;
+        }
+
+        .secondary-btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: white;
+        }
+
         .game-status-bar {
             display: flex;
             justify-content: space-between;
@@ -166,15 +178,17 @@
         </div>
         <p class="subtitle">მულტიპლეიერი - იპოვეთ საიდუმლო სიტყვა ერთად</p>
 
-        <!-- ოთახის და PIN კოდის პანელი -->
         <div id="room-setup" class="input-group">
+            <button id="create-room-btn">ახალი ოთახის შექმნა (자동 PIN)</button>
+            <div style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin: 4px 0;">ან</div>
             <input type="text" id="room-input" placeholder="შეიყვანეთ ოთახის PIN კოდი...">
-            <button id="join-room-btn">ოთახში შესვლა / შექმნა</button>
+            <button id="join-room-btn" class="secondary-btn">ოთახში შესვლა კოდით</button>
         </div>
 
-        <!-- თამაშის ძირითადი პანელი (თავიდან დამალულია, სანამ ოთახში არ შეხვალთ) -->
         <div id="game-panel" class="hidden">
-            <div id="status-bar" class="game-status-bar">ოთახი: <span id="current-room-name">არ არის</span></div>
+            <div id="status-bar" class="game-status-bar">
+                <span>ოთახი PIN: <span id="current-room-name" style="color:white;">-</span></span>
+            </div>
             
             <div class="input-group">
                 <input type="text" id="guess-input" placeholder="შეიყვანეთ სიტყვა...">
@@ -191,6 +205,7 @@
         const roomSetup = document.getElementById('room-setup');
         const gamePanel = document.getElementById('game-panel');
         const roomInput = document.getElementById('room-input');
+        const createRoomBtn = document.getElementById('create-room-btn');
         const joinRoomBtn = document.getElementById('join-room-btn');
         const currentRoomName = document.getElementById('current-room-name');
         
@@ -200,14 +215,26 @@
 
         let currentRoom = '';
 
-        // ოთახში შესვლა / PIN კოდის გაგზავნა
+        // ახალი ოთახის შექმნა (ავტომატური PIN-ის გენერაცია)
+        createRoomBtn.addEventListener('click', () => {
+            const randomPin = Math.floor(1000 + Math.random() * 9000).toString();
+            currentRoom = randomPin;
+            
+            socket.emit('join_room', { room: currentRoom });
+            
+            currentRoomName.textContent = currentRoom;
+            roomSetup.classList.add('hidden');
+            gamePanel.classList.remove('hidden');
+        });
+
+        // არსებულ ოთახში შესვლა ჩწერილი PIN-ით
         joinRoomBtn.addEventListener('click', () => {
             const roomCode = roomInput.value.trim();
             if (roomCode) {
                 currentRoom = roomCode;
-                socket.emit('join_room', { room: roomCode });
+                socket.emit('join_room', { room: currentRoom });
                 
-                currentRoomName.textContent = roomCode;
+                currentRoomName.textContent = currentRoom;
                 roomSetup.classList.add('hidden');
                 gamePanel.classList.remove('hidden');
             } else {
@@ -238,7 +265,7 @@
             });
         }
 
-        // სერვერიდან შედეგების მიღება და ეკრანზე გამოტანა
+        // სერვერიდან შედეგების მიღება და ეკრანზე ისტორიის ჩვენება
         socket.on('guess_result', function(data) {
             if (!data) return;
 
@@ -248,6 +275,7 @@
             const wordSpan = document.createElement('span');
             wordSpan.textContent = data.word || '';
             wordSpan.style.zIndex = '2';
+            wordSpan.style.fontWeight = 'bold';
 
             const scoreSpan = document.createElement('span');
             scoreSpan.textContent = data.score !== undefined ? `სიახლოვე: ${data.score}` : '';
@@ -257,7 +285,7 @@
             card.appendChild(wordSpan);
             card.appendChild(scoreSpan);
             
-            // ისტორიის თავში დამატება
+            // ახალი სიტყვა დაემატება სიის თავში
             historyDiv.prepend(card);
         });
     </script>
