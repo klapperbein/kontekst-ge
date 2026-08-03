@@ -306,7 +306,11 @@
     </div>
 
     <script>
-        const socket = io();
+       const socket = io({
+    transports: ['websocket', 'polling'],
+    secure: true,
+    rejectUnauthorized: false
+});
         let currentRoom = "";
         let username = "";
         let allGuesses = []; // ინახავს ყველა სიტყვას სორტირებისთვის
