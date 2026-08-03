@@ -67,6 +67,8 @@ def get_similarity(w1, w2):
     v1 = find_vector(w1)
     v2 = find_vector(w2)
     
+    print(f"🔍 ვეძებთ სიტყვებს: '{w1}' -> {'ნაპოვნია' if v1 is not None else 'ვერ მოიძებნა'} | სამიზნე: '{w2}' -> {'ნაპოვნია' if v2 is not None else 'ვერ მოიძებნა'}")
+    
     if v1 is None or v2 is None:
         return 0.0
         
