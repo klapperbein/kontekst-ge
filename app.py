@@ -13,21 +13,22 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 word_vectors = {}
 
 def load_vectors():
-    vector_file = "vectors.vec"
+    vector_file = "vectors.txt"
     if not os.path.exists(vector_file):
         print(f"⚠️ გაფრთხილება: {vector_file} ვერ მოიძებნა!")
         return
 
-    print("🚀 ტვირთება ქართული ენის ოპტიმიზებული მოდელი...")
+    print("🚀 იტვირთება ქართული ენის ოპტიმიზებული მოდელი...")
     with open(vector_file, "r", encoding="utf-8") as f:
         first_line = f.readline()
         for line in f:
-           parts = line.rstrip().split(" ")
-            word = parts[0].strip().lower()
-            vector = np.array([float(x) for x in parts[1:]], dtype=np.float32)
-            norm = np.linalg.norm(vector)
-            if norm > 0:
-                word_vectors[word] = vector / norm
+            parts = line.rstrip().split(" ")
+            if len(parts) > 1:
+                word = parts[0].strip().lower()
+                vector = np.array([float(x) for x in parts[1:]], dtype=np.float32)
+                norm = np.linalg.norm(vector)
+                if norm > 0:
+                    word_vectors[word] = vector / norm
     print("✅ მოდელი წარმატებით ჩაიტვირთა!")
 
 load_vectors()
@@ -47,11 +48,28 @@ TARGET_WORDS = [
 
 rooms = {}
 
+def find_vector(word):
+    """სიტყვის ძებნა ლექსიკონში, მათ შორის ბრუნვების მოხსნით"""
+    if word in word_vectors:
+        return word_vectors[word]
+    
+    # მარტივი ჰიურისტიკა ქართული ბრუნვების მოსახსნელად
+    suffixes = ["მა", "ში", "ზე", "დან", "თან", "ის", "ს", "მაც", "მაგნი", "ად"]
+    for suffix in suffixes:
+        if word.endswith(suffix) and len(word) > len(suffix) + 2:
+            stem = word[:-len(suffix)]
+            if stem in word_vectors:
+                return word_vectors[stem]
+                
+    return None
+
 def get_similarity(w1, w2):
-    if w1 not in word_vectors or w2 not in word_vectors:
+    v1 = find_vector(w1)
+    v2 = find_vector(w2)
+    
+    if v1 is None or v2 is None:
         return 0.0
-    v1 = word_vectors[w1]
-    v2 = word_vectors[w2]
+        
     sim = np.dot(v1, v2)
     score = max(0.0, float(sim)) * 100
     return round(score, 1)
@@ -120,6 +138,12 @@ def handle_make_guess(data):
     score = get_similarity(word, target)
     is_correct = (word == target)
 
+    # თუ ზუსტად დაემთხვა ან ფესვი ემთხვევა
+    if not is_correct and find_vector(word) is not None and find_vector(target) is not None:
+        if np.allclose(find_vector(word), find_vector(target), atol=1e-5):
+            is_correct = True
+            score = 100.0
+
     guess_entry = {
         'player': username,
         'word': word,
@@ -127,8 +151,6 @@ def handle_make_guess(data):
     }
     
     room['guesses'].append(guess_entry)
-    
-    # 🌟 მუდმივად ვალაგებთ ქულის კლებადობით (ყველაზე მაღალი პროცენტი მიდის თავში)
     room['guesses'] = sorted(room['guesses'], key=lambda x: x['score'], reverse=True)
     
     guesses_count = len(room['guesses'])
