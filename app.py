@@ -13,7 +13,7 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 word_vectors = {}
 
 def load_vectors():
-    vector_file = "cc.ka.300.small.vec"
+    vector_file = "vectors.vec"
     if not os.path.exists(vector_file):
         print(f"⚠️ გაფრთხილება: {vector_file} ვერ მოიძებნა!")
         return
