@@ -261,7 +261,6 @@
         </div>
         <p class="subtitle">მულტიპლეიერ სიტყვების თამაში</p>
 
-        <!-- LOBBY SECTION -->
         <div id="lobby-section">
             <div class="input-group">
                 <input type="text" id="username" placeholder="შეიყვანეთ ნიკნეიმი...">
@@ -276,7 +275,6 @@
             </div>
         </div>
 
-        <!-- GAME SECTION -->
         <div id="game-section" class="hidden">
             <div class="game-status-bar">
                 <span id="display-room-code">კოდი: ----</span>
@@ -289,11 +287,9 @@
             </div>
 
             <div class="guess-history" id="guess-list">
-                <!-- მცდელობები გამოჩნდება აქ -->
-            </div>
+                </div>
         </div>
 
-        <!-- 📢 ADVERTISEMENT BLOCK -->
         <div class="ad-container">
             <div class="ad-label">რეკლამა / Advertisement</div>
             <div class="ad-placeholder" id="ad-slot">
@@ -301,7 +297,6 @@
             </div>
         </div>
 
-        <!-- GAME OVER / WIN MODAL -->
         <div id="game-modal" class="modal-overlay hidden">
             <h2 id="modal-heading" class="modal-title">Game Over</h2>
             <p id="modal-desc">საიდუმლო სიტყვა იყო:</p>
@@ -310,7 +305,6 @@
         </div>
     </div>
 
-    <!-- ⚡️ აი აქ არის JAVASCRIPT-ის კოდი ⚡️ -->
     <script>
         const socket = io();
         let currentRoom = "";
@@ -335,8 +329,11 @@
             const word = input.value.trim();
             if(!word) return;
 
-            socket.emit('make_guess', { room_id: currentRoom, username: username, word: word });
+            // მყისიერად ვასუფთავებთ და ვფოკუსირებთ ინპუთს
             input.value = "";
+            input.focus();
+
+            socket.emit('make_guess', { room_id: currentRoom, username: username, word: word });
         }
 
         function restartGame() {
@@ -396,71 +393,4 @@
         });
 
         function setupGameView(count, max) {
-            document.getElementById('lobby-section').classList.add('hidden');
-            document.getElementById('game-section').classList.remove('hidden');
-            document.getElementById('display-room-code').innerText = "კოდი: " + currentRoom;
-            updateGuessCount(count || 0, max || 30);
-        }
-
-        function updateGuessCount(count, max) {
-            document.getElementById('display-guess-count').innerText = `სვლები: ${count} / ${max}`;
-        }
-
-        function getColorForScore(score) {
-            if (score > 50) return '#22c55e'; // Green
-            if (score > 25) return '#eab308'; // Yellow
-            return '#ef4444'; // Red
-        }
-
-        // 🔝 სორტირების ლოგიკა (მაღალი პროცენტები ზემოთ)
-        function addGuessToUI(player, word, score) {
-            const existingIndex = allGuesses.findIndex(item => item.word.toLowerCase() === word.toLowerCase());
-            if (existingIndex === -1) {
-                allGuesses.push({ player, word, score: parseFloat(score) });
-            }
-
-            // ვასორტირებთ კლების მიხედვით
-            allGuesses.sort((a, b) => b.score - a.score);
-
-            renderGuessList();
-        }
-
-        function renderGuessList() {
-            const list = document.getElementById('guess-list');
-            list.innerHTML = "";
-
-            allGuesses.forEach(item => {
-                const color = getColorForScore(item.score);
-                const card = document.createElement('div');
-                card.className = 'guess-card';
-                
-                card.innerHTML = `
-                    <div class="guess-progress" style="width: ${Math.max(item.score, 5)}%; background-color: ${color};"></div>
-                    <div class="guess-info">
-                        <div>
-                            <div class="word-text">${item.word}</div>
-                            <div class="player-name">👤 ${item.player}</div>
-                        </div>
-                        <div class="score-text" style="color: ${color};">${item.score}%</div>
-                    </div>
-                `;
-
-                list.appendChild(card);
-            });
-        }
-
-        function showModal(title, desc, word = "") {
-            document.getElementById('modal-heading').innerText = title;
-            document.getElementById('modal-desc').innerText = desc;
-            const wordEl = document.getElementById('modal-target-word');
-            if(word) {
-                wordEl.innerText = word;
-                wordEl.classList.remove('hidden');
-            } else {
-                wordEl.classList.add('hidden');
-            }
-            document.getElementById('game-modal').classList.remove('hidden');
-        }
-    </script>
-</body>
-</html>
+            document.getElementById
