@@ -9,7 +9,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret-key-kontekst-ge'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# 1. FastText მოდელის ჩატვირთვა (ოპტიმიზებული small მოდელი)
+# FastText მოდელის ჩატვირთვა
 word_vectors = {}
 
 def load_vectors():
@@ -32,7 +32,6 @@ def load_vectors():
 
 load_vectors()
 
-# 2. საიდუმლო სიტყვების ბაზა
 TARGET_WORDS = [
     "სახლი", "კომპიუტერი", "წიგნი", "მანქანა", "ტელეფონი", "საათი", "კალამი", "მაგიდა", "სკამი", "ოთახი",
     "ფანჯარა", "კარი", "ჩანთა", "ფული", "სარკე", "საწოლი", "კარადა", "ხალიჩა", "ლამპა", "ტელევიზორი",
@@ -41,7 +40,7 @@ TARGET_WORDS = [
     "ავტომობილი", "ავტობუსი", "მატარებელი", "თვითმფრინავი", "გემი", "ველოსიპედი", "რაკეტა", "დრონი",
     "პური", "ყველი", "ღვინო", "ყავა", "ჩაი", "ხორცი", "ვაშლი", "შოკოლადი", "სადილი", "საუზმე",
     "ძაღლი", "კატა", "ცხენი", "ფრინველი", "დათვი", "მგელი", "არწივი", "ლომი", "ვეფხვი",
-    "ადამიანი", "კაცი", "ქალი", "ბავშვი", "ბიჭი", "გოგო", "ექიმი", "მასწავლებებელი", "ინჟინერი", "მეგობარი",
+    "ადამიანი", "კაცი", "ქალი", "ბავშვი", "ბიჭი", "გოგო", "ექიმი", "მასწავლებელი", "ინჟინერი", "მეგობარი",
     "სიყვარული", "ბედნიერება", "სიცოცხლე", "ოცნება", "იმედი", "სიმშვიდე", "თავისუფლება", "დრო", "ისტორია",
     "ფეხბურთი", "კალათბურთი", "ჭადრაკი", "ცურვა", "სირბილი", "კინო", "ფილმი", "მუსიკა", "ცეკვა"
 ]
@@ -128,20 +127,24 @@ def handle_make_guess(data):
     }
     
     room['guesses'].append(guess_entry)
+    
+    # 🌟 მუდმივად ვალაგებთ ქულის კლებადობით (ყველაზე მაღალი პროცენტი მიდის თავში)
+    room['guesses'] = sorted(room['guesses'], key=lambda x: x['score'], reverse=True)
+    
     guesses_count = len(room['guesses'])
 
     if is_correct or guesses_count >= room['max_guesses']:
         room['is_over'] = True
 
-    emit('opponent_guessed', {
-        'player': username,
-        'word': word,
-        'score': score,
-        'is_correct': is_correct,
+    emit('room_update', {
+        'history': room['guesses'],
         'guesses_count': guesses_count,
         'max_guesses': room['max_guesses'],
         'is_over': room['is_over'],
-        'target_word': target if room['is_over'] else None
+        'is_correct': is_correct,
+        'target_word': target if room['is_over'] else None,
+        'latest_word': word,
+        'latest_player': username
     }, to=room_id)
 
 if __name__ == '__main__':
