@@ -22,8 +22,8 @@ def load_vectors():
     with open(vector_file, "r", encoding="utf-8") as f:
         first_line = f.readline()
         for line in f:
-            parts = line.rstrip().split(" ")
-            word = parts[0]
+           parts = line.rstrip().split(" ")
+            word = parts[0].strip().lower()
             vector = np.array([float(x) for x in parts[1:]], dtype=np.float32)
             norm = np.linalg.norm(vector)
             if norm > 0:
