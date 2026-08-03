@@ -14,6 +14,7 @@
             --text-color: #f8fafc;
             --text-muted: #94a3b8;
             --border-color: #334155;
+            --success-color: #10b981;
         }
 
         * {
@@ -147,17 +148,12 @@
             border: 1px solid var(--border-color);
             min-height: 54px;
             display: flex;
+            justify-content: space-between;
             align-items: center;
         }
 
-        .guess-progress {
-            position: absolute;
-            left: 0;
-            top: 0;
-            height: 100%;
-            background: rgba(99, 102, 241, 0.15);
-            z-index: 1;
-            transition: width 0.3s ease;
+        .hidden {
+            display: none !important;
         }
     </style>
 </head>
@@ -168,29 +164,69 @@
             <span class="flag-icon">🇬🇪</span>
             <h1>კონტექსტი</h1>
         </div>
-        <p class="subtitle">იპოვე საიდუმლო სიტყვა სემანტიკური სიახლოვით</p>
-        
-        <div class="input-group">
-            <input type="text" id="guess-input" placeholder="შეიყვანეთ სიტყვა...">
-            <button id="guess-btn">გამოცნობა</button>
+        <p class="subtitle">მულტიპლეიერი - იპოვეთ საიდუმლო სიტყვა ერთად</p>
+
+        <!-- ოთახის და PIN კოდის პანელი -->
+        <div id="room-setup" class="input-group">
+            <input type="text" id="room-input" placeholder="შეიყვანეთ ოთახის PIN კოდი...">
+            <button id="join-room-btn">ოთახში შესვლა / შექმნა</button>
         </div>
 
-        <div id="status-bar" class="game-status-bar" style="display:none;"></div>
-        <div id="history" class="guess-history"></div>
+        <!-- თამაშის ძირითადი პანელი (თავიდან დამალულია, სანამ ოთახში არ შეხვალთ) -->
+        <div id="game-panel" class="hidden">
+            <div id="status-bar" class="game-status-bar">ოთახი: <span id="current-room-name">არ არის</span></div>
+            
+            <div class="input-group">
+                <input type="text" id="guess-input" placeholder="შეიყვანეთ სიტყვა...">
+                <button id="guess-btn">გამოცნობა</button>
+            </div>
+
+            <div id="history" class="guess-history"></div>
+        </div>
     </div>
 
     <script>
-        // უსაფრთხო სოკეტისა და ელემენტების ინიციალიზაცია
         const socket = io();
+
+        const roomSetup = document.getElementById('room-setup');
+        const gamePanel = document.getElementById('game-panel');
+        const roomInput = document.getElementById('room-input');
+        const joinRoomBtn = document.getElementById('join-room-btn');
+        const currentRoomName = document.getElementById('current-room-name');
         
         const guessInput = document.getElementById('guess-input');
         const guessBtn = document.getElementById('guess-btn');
+        const historyDiv = document.getElementById('history');
 
+        let currentRoom = '';
+
+        // ოთახში შესვლა / PIN კოდის გაგზავნა
+        joinRoomBtn.addEventListener('click', () => {
+            const roomCode = roomInput.value.trim();
+            if (roomCode) {
+                currentRoom = roomCode;
+                socket.emit('join_room', { room: roomCode });
+                
+                currentRoomName.textContent = roomCode;
+                roomSetup.classList.add('hidden');
+                gamePanel.classList.remove('hidden');
+            } else {
+                alert('გთხოვთ შეიყვანოთ ოთახის PIN კოდი!');
+            }
+        });
+
+        roomInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                joinRoomBtn.click();
+            }
+        });
+
+        // სიტყვის გამოცნობის გაგზავნა სერვერზე
         if (guessBtn && guessInput) {
             guessBtn.addEventListener('click', () => {
                 const word = guessInput.value.trim();
-                if (word) {
-                    socket.emit('make_guess', { word: word });
+                if (word && currentRoom) {
+                    socket.emit('make_guess', { room: currentRoom, word: word });
                     guessInput.value = '';
                 }
             });
@@ -201,6 +237,29 @@
                 }
             });
         }
+
+        // სერვერიდან შედეგების მიღება და ეკრანზე გამოტანა
+        socket.on('guess_result', function(data) {
+            if (!data) return;
+
+            const card = document.createElement('div');
+            card.className = 'guess-card';
+            
+            const wordSpan = document.createElement('span');
+            wordSpan.textContent = data.word || '';
+            wordSpan.style.zIndex = '2';
+
+            const scoreSpan = document.createElement('span');
+            scoreSpan.textContent = data.score !== undefined ? `სიახლოვე: ${data.score}` : '';
+            scoreSpan.style.zIndex = '2';
+            scoreSpan.style.color = 'var(--accent-color)';
+
+            card.appendChild(wordSpan);
+            card.appendChild(scoreSpan);
+            
+            // ისტორიის თავში დამატება
+            historyDiv.prepend(card);
+        });
     </script>
 </body>
 </html>
