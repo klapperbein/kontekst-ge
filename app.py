@@ -53,8 +53,7 @@ def find_vector(word):
     if word in word_vectors:
         return word_vectors[word]
     
-    # მარტივი ჰიურისტიკა ქართული ბრუნვების მოსახსნელად
-    suffixes = ["მა", "ში", "ზე", "დან", "თან", "ის", "ს", "მაც", "მაგნი", "ად"]
+    suffixes = ["მა", "ში", "ზე", "დან", "თან", "ის", "ს", "მაც", "ად"]
     for suffix in suffixes:
         if word.endswith(suffix) and len(word) > len(suffix) + 2:
             stem = word[:-len(suffix)]
@@ -140,7 +139,6 @@ def handle_make_guess(data):
     score = get_similarity(word, target)
     is_correct = (word == target)
 
-    # თუ ზუსტად დაემთხვა ან ფესვი ემთხვევა
     if not is_correct and find_vector(word) is not None and find_vector(target) is not None:
         if np.allclose(find_vector(word), find_vector(target), atol=1e-5):
             is_correct = True
