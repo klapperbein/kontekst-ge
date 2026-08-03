@@ -180,7 +180,7 @@
 
         <!-- ოთახის არჩევის პანელი -->
         <div id="room-setup" class="input-group">
-            <input type="text" id="username-input" placeholder="თქვენი სახელი..." value="მოთამაშე">
+            <input type="text" id="username-input" placeholder="თქვენი სახელი...">
             <button id="create-room-btn">ახალი ოთახის შექმნა</button>
             <div style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin: 4px 0;">ან</div>
             <input type="text" id="room-input" placeholder="შეიყვანეთ ოთახის PIN კოდი...">
@@ -252,7 +252,6 @@
             roomSetup.classList.add('hidden');
             gamePanel.classList.remove('hidden');
 
-            // ძველი ისტორიის ჩატვირთვა თუ უკვე თამაშობენ
             if (data.history) {
                 historyDiv.innerHTML = '';
                 data.history.forEach(item => {
@@ -265,7 +264,7 @@
             alert(data.error);
         });
 
-        // 3. სიტყვის გამოცნობის გაგზავნა
+        // 3. სიტყვის გამოცნობა
         if (guessBtn && guessInput) {
             guessBtn.addEventListener('click', () => {
                 const word = guessInput.value.trim();
@@ -286,16 +285,16 @@
             });
         }
 
-        // 4. შედეგების მიღება სერვერიდან (opponent_guessed)
+        // 4. შედეგების მიღება
         socket.on('opponent_guessed', function(data) {
             if (!data) return;
             appendGuessCard(data.word, data.score, data.player);
 
             if (data.is_over) {
                 if (data.is_correct) {
-                    alert(`🎉 გილოცავთ! სიტყვა გამოიცნო (${data.player}): ${data.target_word}`);
+                    alert(`🎉 გილოცავთ! სიტყვა გამოიცნო (${data.player}): მისანი იყო ${data.target_word}`);
                 } else {
-                    alert(`ტელევიზორმა/თამაშმა დაასრულა მცდელობები. საიდუმლო სიტყვა იყო: ${data.target_word}`);
+                    alert(`მცდელობები ამოიწურა. საიდუმლო სიტყვა იყო: ${data.target_word}`);
                 }
             }
         });
