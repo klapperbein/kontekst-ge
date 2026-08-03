@@ -178,13 +178,16 @@
         </div>
         <p class="subtitle">მულტიპლეიერი - იპოვეთ საიდუმლო სიტყვა ერთად</p>
 
+        <!-- ოთახის არჩევის პანელი -->
         <div id="room-setup" class="input-group">
-            <button id="create-room-btn">ახალი ოთახის შექმნა (자동 PIN)</button>
+            <input type="text" id="username-input" placeholder="თქვენი სახელი..." value="მოთამაშე">
+            <button id="create-room-btn">ახალი ოთახის შექმნა</button>
             <div style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin: 4px 0;">ან</div>
             <input type="text" id="room-input" placeholder="შეიყვანეთ ოთახის PIN კოდი...">
             <button id="join-room-btn" class="secondary-btn">ოთახში შესვლა კოდით</button>
         </div>
 
+        <!-- თამაშის ძირითადი პანელი -->
         <div id="game-panel" class="hidden">
             <div id="status-bar" class="game-status-bar">
                 <span>ოთახი PIN: <span id="current-room-name" style="color:white;">-</span></span>
@@ -204,6 +207,7 @@
 
         const roomSetup = document.getElementById('room-setup');
         const gamePanel = document.getElementById('game-panel');
+        const usernameInput = document.getElementById('username-input');
         const roomInput = document.getElementById('room-input');
         const createRoomBtn = document.getElementById('create-room-btn');
         const joinRoomBtn = document.getElementById('join-room-btn');
@@ -214,46 +218,63 @@
         const historyDiv = document.getElementById('history');
 
         let currentRoom = '';
+        let currentUsername = 'მოთამაშე';
 
-        // ახალი ოთახის შექმნა (ავტომატური PIN-ის გენერაცია)
+        // 1. ახალი ოთახის შექმნა
         createRoomBtn.addEventListener('click', () => {
-            const randomPin = Math.floor(1000 + Math.random() * 9000).toString();
-            currentRoom = randomPin;
-            
-            socket.emit('join_room', { room: currentRoom });
-            
+            currentUsername = usernameInput.value.trim() || 'მოთამაშე 1';
+            socket.emit('create_room', { username: currentUsername });
+        });
+
+        socket.on('room_created', (data) => {
+            currentRoom = data.room_id;
             currentRoomName.textContent = currentRoom;
             roomSetup.classList.add('hidden');
             gamePanel.classList.remove('hidden');
         });
 
-        // არსებულ ოთახში შესვლა ჩწერილი PIN-ით
+        // 2. არსებულ ოთახში შესვლა PIN-ით
         joinRoomBtn.addEventListener('click', () => {
             const roomCode = roomInput.value.trim();
+            currentUsername = usernameInput.value.trim() || 'მოთამაშე 2';
+            
             if (roomCode) {
                 currentRoom = roomCode;
-                socket.emit('join_room', { room: currentRoom });
-                
-                currentRoomName.textContent = currentRoom;
-                roomSetup.classList.add('hidden');
-                gamePanel.classList.remove('hidden');
+                socket.emit('join_room', { room_id: currentRoom, username: currentUsername });
             } else {
                 alert('გთხოვთ შეიყვანოთ ოთახის PIN კოდი!');
             }
         });
 
-        roomInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                joinRoomBtn.click();
+        socket.on('player_joined', (data) => {
+            currentRoom = data.room_id;
+            currentRoomName.textContent = currentRoom;
+            roomSetup.classList.add('hidden');
+            gamePanel.classList.remove('hidden');
+
+            // ძველი ისტორიის ჩატვირთვა თუ უკვე თამაშობენ
+            if (data.history) {
+                historyDiv.innerHTML = '';
+                data.history.forEach(item => {
+                    appendGuessCard(item.word, item.score, item.player);
+                });
             }
         });
 
-        // სიტყვის გამოცნობის გაგზავნა სერვერზე
+        socket.on('error_message', (data) => {
+            alert(data.error);
+        });
+
+        // 3. სიტყვის გამოცნობის გაგზავნა
         if (guessBtn && guessInput) {
             guessBtn.addEventListener('click', () => {
                 const word = guessInput.value.trim();
                 if (word && currentRoom) {
-                    socket.emit('make_guess', { room: currentRoom, word: word });
+                    socket.emit('make_guess', { 
+                        room_id: currentRoom, 
+                        username: currentUsername, 
+                        word: word 
+                    });
                     guessInput.value = '';
                 }
             });
@@ -265,29 +286,38 @@
             });
         }
 
-        // სერვერიდან შედეგების მიღება და ეკრანზე ისტორიის ჩვენება
-        socket.on('guess_result', function(data) {
+        // 4. შედეგების მიღება სერვერიდან (opponent_guessed)
+        socket.on('opponent_guessed', function(data) {
             if (!data) return;
+            appendGuessCard(data.word, data.score, data.player);
 
+            if (data.is_over) {
+                if (data.is_correct) {
+                    alert(`🎉 გილოცავთ! სიტყვა გამოიცნო (${data.player}): ${data.target_word}`);
+                } else {
+                    alert(`ტელევიზორმა/თამაშმა დაასრულა მცდელობები. საიდუმლო სიტყვა იყო: ${data.target_word}`);
+                }
+            }
+        });
+
+        function appendGuessCard(word, score, player) {
             const card = document.createElement('div');
             card.className = 'guess-card';
             
             const wordSpan = document.createElement('span');
-            wordSpan.textContent = data.word || '';
+            wordSpan.innerHTML = `<b>${word}</b> <span style="font-size:0.8rem; color:var(--text-muted);">(${player})</span>`;
             wordSpan.style.zIndex = '2';
-            wordSpan.style.fontWeight = 'bold';
 
             const scoreSpan = document.createElement('span');
-            scoreSpan.textContent = data.score !== undefined ? `სიახლოვე: ${data.score}` : '';
+            scoreSpan.textContent = `სიახლოვე: ${score}`;
             scoreSpan.style.zIndex = '2';
             scoreSpan.style.color = 'var(--accent-color)';
 
             card.appendChild(wordSpan);
             card.appendChild(scoreSpan);
             
-            // ახალი სიტყვა დაემატება სიის თავში
             historyDiv.prepend(card);
-        });
+        }
     </script>
 </body>
 </html>
