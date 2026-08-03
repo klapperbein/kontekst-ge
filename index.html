@@ -153,4 +153,54 @@
         .guess-progress {
             position: absolute;
             left: 0;
-            top:
+            top: 0;
+            height: 100%;
+            background: rgba(99, 102, 241, 0.15);
+            z-index: 1;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header-title">
+            <span class="flag-icon">🇬🇪</span>
+            <h1>კონტექსტი</h1>
+        </div>
+        <p class="subtitle">იპოვე საიდუმლო სიტყვა სემანტიკური სიახლოვით</p>
+        
+        <div class="input-group">
+            <input type="text" id="guess-input" placeholder="შეიყვანეთ სიტყვა...">
+            <button id="guess-btn">გამოცნობა</button>
+        </div>
+
+        <div id="status-bar" class="game-status-bar" style="display:none;"></div>
+        <div id="history" class="guess-history"></div>
+    </div>
+
+    <script>
+        // უსაფრთხო სოკეტისა და ელემენტების ინიციალიზაცია
+        const socket = io();
+        
+        const guessInput = document.getElementById('guess-input');
+        const guessBtn = document.getElementById('guess-btn');
+
+        if (guessBtn && guessInput) {
+            guessBtn.addEventListener('click', () => {
+                const word = guessInput.value.trim();
+                if (word) {
+                    socket.emit('make_guess', { word: word });
+                    guessInput.value = '';
+                }
+            });
+
+            guessInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    guessBtn.click();
+                }
+            });
+        }
+    </script>
+</body>
+</html>
