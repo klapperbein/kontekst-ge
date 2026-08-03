@@ -15,6 +15,7 @@
             --text-muted: #94a3b8;
             --border-color: #334155;
             --success-color: #10b981;
+            --top-highlight: #f59e0b; /* ოქროსფერი აქცენტი ლიდერი/მაღალი ქულის სიტყვებისთვის */
         }
 
         * {
@@ -164,6 +165,18 @@
             align-items: center;
         }
 
+        /* 🌟 ყველაზე მაღალი პროცენტის მქონე ბარათის გამოკვეთა ოქროსფერი ფერით */
+        .guess-card.top-guess {
+            border-color: var(--top-highlight);
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .guess-card.top-guess .score-text {
+            color: var(--top-highlight) !important;
+            font-weight: 900;
+            font-size: 1.1rem;
+        }
+
         .hidden {
             display: none !important;
         }
@@ -178,7 +191,6 @@
         </div>
         <p class="subtitle">მულტიპლეიერი - იპოვეთ საიდუმლო სიტყვა ერთად</p>
 
-        <!-- ოთახის არჩევის პანელი -->
         <div id="room-setup" class="input-group">
             <input type="text" id="username-input" placeholder="თქვენი სახელი...">
             <button id="create-room-btn">ახალი ოთახის შექმნა</button>
@@ -187,7 +199,6 @@
             <button id="join-room-btn" class="secondary-btn">ოთახში შესვლა კოდით</button>
         </div>
 
-        <!-- თამაშის ძირითადი პანელი -->
         <div id="game-panel" class="hidden">
             <div id="status-bar" class="game-status-bar">
                 <span>ოთახი PIN: <span id="current-room-name" style="color:white;">-</span></span>
@@ -220,7 +231,6 @@
         let currentRoom = '';
         let currentUsername = 'მოთამაშე';
 
-        // 1. ახალი ოთახის შექმნა
         createRoomBtn.addEventListener('click', () => {
             currentUsername = usernameInput.value.trim() || 'მოთამაშე 1';
             socket.emit('create_room', { username: currentUsername });
@@ -233,7 +243,6 @@
             gamePanel.classList.remove('hidden');
         });
 
-        // 2. არსებულ ოთახში შესვლა PIN-ით
         joinRoomBtn.addEventListener('click', () => {
             const roomCode = roomInput.value.trim();
             currentUsername = usernameInput.value.trim() || 'მოთამაშე 2';
@@ -253,10 +262,7 @@
             gamePanel.classList.remove('hidden');
 
             if (data.history) {
-                historyDiv.innerHTML = '';
-                data.history.forEach(item => {
-                    appendGuessCard(item.word, item.score, item.player);
-                });
+                updateHistoryUI(data.history);
             }
         });
 
@@ -264,7 +270,6 @@
             alert(data.error);
         });
 
-        // 3. სიტყვის გამოცნობა
         if (guessBtn && guessInput) {
             guessBtn.addEventListener('click', () => {
                 const word = guessInput.value.trim();
@@ -285,37 +290,44 @@
             });
         }
 
-        // 4. შედეგების მიღება
-        socket.on('opponent_guessed', function(data) {
+        // სერვერიდან შემოსული განახლებული და დალაგებული ისტორია
+        socket.on('room_update', function(data) {
             if (!data) return;
-            appendGuessCard(data.word, data.score, data.player);
+            updateHistoryUI(data.history);
 
             if (data.is_over) {
                 if (data.is_correct) {
-                    alert(`🎉 გილოცავთ! სიტყვა გამოიცნო (${data.player}): მისანი იყო ${data.target_word}`);
+                    alert(`🎉 გილოცავთ! სიტყვა გამოიცნო (${data.latest_player}): ${data.target_word}`);
                 } else {
                     alert(`მცდელობები ამოიწურა. საიდუმლო სიტყვა იყო: ${data.target_word}`);
                 }
             }
         });
 
-        function appendGuessCard(word, score, player) {
-            const card = document.createElement('div');
-            card.className = 'guess-card';
+        function updateHistoryUI(historyList) {
+            historyDiv.innerHTML = '';
             
-            const wordSpan = document.createElement('span');
-            wordSpan.innerHTML = `<b>${word}</b> <span style="font-size:0.8rem; color:var(--text-muted);">(${player})</span>`;
-            wordSpan.style.zIndex = '2';
+            historyList.forEach((item, index) => {
+                const card = document.createElement('div');
+                // პირველი (ყველაზე მაღალი პროცენტის) ბარათი მიიღებს top-guess კლასს და ოქროსფერ ფერს
+                card.className = `guess-card ${index === 0 ? 'top-guess' : ''}`;
+                
+                const wordSpan = document.createElement('span');
+                let badge = index === 0 ? ' 🔥' : '';
+                wordSpan.innerHTML = `<b>${item.word}</b>${badge} <span style="font-size:0.8rem; color:var(--text-muted);">(${item.player})</span>`;
+                wordSpan.style.zIndex = '2';
 
-            const scoreSpan = document.createElement('span');
-            scoreSpan.textContent = `სიახლოვე: ${score}`;
-            scoreSpan.style.zIndex = '2';
-            scoreSpan.style.color = 'var(--accent-color)';
+                const scoreSpan = document.createElement('span');
+                scoreSpan.className = 'score-text';
+                scoreSpan.textContent = `სიახლოვე: ${item.score}`;
+                scoreSpan.style.zIndex = '2';
+                scoreSpan.style.color = 'var(--accent-color)';
 
-            card.appendChild(wordSpan);
-            card.appendChild(scoreSpan);
-            
-            historyDiv.prepend(card);
+                card.appendChild(wordSpan);
+                card.appendChild(scoreSpan);
+                
+                historyDiv.appendChild(card);
+            });
         }
     </script>
 </body>
