@@ -12,15 +12,10 @@ app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
 
 word_vectors = {}
-CURRENT_TARGET_WORD = "მგელი"
 MAX_ATTEMPTS = 30
 
 rooms = {}
 
-# ==================== ვექტორების ავტომატური ჩამოტვირთვა ====================
-# Railway Volume-ის mount path (თუ Volume არ გაქვთ დამატებული, გამოიყენება
-# ჩვეულებრივი ლოკალური საქაღალდე, მაგრამ მაშინ ყოველ restart-ზე თავიდან
-# ჩამოიტვირთება ფაილი)
 VECTOR_DIR = "/data" if os.path.exists("/data") else "."
 VECTOR_PATH = os.path.join(VECTOR_DIR, "vectors.vec")
 
@@ -71,7 +66,50 @@ def load_vectors():
 
 download_vectors_if_needed()
 load_vectors()
+
+# ==================== სამიზნე სიტყვების ავტომატური გენერაცია ====================
+# ხელით სიის დაწერის მაგივრად, ვირჩევთ სიტყვებს პირდაპირ ჩატვირთული
+# ვექტორებიდან. ვინაიდან ფაილი სიხშირის მიხედვითაა დალაგებული, ჯერ
+# ვტოვებთ ყველაზე ხშირ სიტყვებს (ხშირად ესენი კავშირები/ნაცვალსახელებია),
+# შემდეგ ვირჩევთ მხოლოდ სუფთა ქართულ, საკმარისი სიგრძის სიტყვებს.
+
+TARGET_POOL_SIZE = 500     # რამდენი სამიზნე სიტყვა გვინდა სულ
+SKIP_TOP_N = 300           # რამდენი ყველაზე ხშირი სიტყვა გამოვტოვოთ
+MIN_WORD_LENGTH = 3        # მინიმალური სიგრძე ასოებში
+
+
+def is_georgian_word(word):
+    if not word:
+        return False
+    return all('\u10A0' <= ch <= '\u10FF' for ch in word)
+
+
+def build_target_word_pool():
+    pool = []
+    for i, word in enumerate(word_vectors.keys()):
+        if i < SKIP_TOP_N:
+            continue
+        if len(word) < MIN_WORD_LENGTH:
+            continue
+        if not is_georgian_word(word):
+            continue
+        pool.append(word)
+        if len(pool) >= TARGET_POOL_SIZE:
+            break
+    return pool
+
+
+VALID_TARGET_WORDS = build_target_word_pool()
+print(f"🎯 სამიზნე სიტყვების პული აშენდა: {len(VALID_TARGET_WORDS)} სიტყვა.")
+
+if not VALID_TARGET_WORDS:
+    print("⚠️ პული ცარიელია! ვიყენებთ fallback-ს.")
+    VALID_TARGET_WORDS = ["მგელი"] if "მგელი" in word_vectors else list(word_vectors.keys())[:1]
 # ================================================================================
+
+
+def pick_target_word():
+    return random.choice(VALID_TARGET_WORDS)
 
 
 def get_similarity(word1, word2):
@@ -118,15 +156,16 @@ def handle_disconnect():
 def handle_create_room(data):
     username = data.get('username', 'მოთამაშე 1')
     room_id = generate_room_id()
+    target_word = pick_target_word()
 
     rooms[room_id] = {
-        'target_word': CURRENT_TARGET_WORD,
+        'target_word': target_word,
         'history': [],
         'is_over': False,
     }
 
     sio_join_room(room_id)
-    print(f"🆕 ოთახი შეიქმნა: {room_id} მომხმარებლის მიერ: {username}")
+    print(f"🆕 ოთახი შეიქმნა: {room_id} მომხმარებლის მიერ: {username} | სამიზნე: {target_word}")
     emit('room_created', {'room_id': room_id})
 
 
