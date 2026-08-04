@@ -25,7 +25,7 @@ VECTOR_DIR = "/data" if os.path.exists("/data") else "."
 VECTOR_PATH = os.path.join(VECTOR_DIR, "vectors.vec")
 
 # ⚠️ ჩასვით აქ თქვენი Hugging Face-ის direct download ლინკი
-DOWNLOAD_URL = "https://huggingface.co/datasets/YOUR-USERNAME/georgian-vectors/resolve/main/vectors.vec"
+DOWNLOAD_URL = "https://huggingface.co/datasets/klapperbein/georgian-vectors/resolve/main/vectors.vec"
 
 
 def download_vectors_if_needed():
