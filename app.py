@@ -1,6 +1,7 @@
 import os
 import random
 import string
+import time
 import requests
 import numpy as np
 from flask import Flask, request, render_template
@@ -133,7 +134,7 @@ if not VALID_TARGET_WORDS:
 
 # ==================== Gemini AI-ს დახმარებით სამიზნე სიტყვის არჩევა ====================
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_MODEL = "gemini-2.5-pro"
+GEMINI_MODEL = "gemini-2.5-flash"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 
 
@@ -149,6 +150,7 @@ def ask_gemini_for_noun():
     )
 
     try:
+        resp = None
         resp = requests.post(
             GEMINI_URL,
             params={"key": GEMINI_API_KEY},
@@ -163,6 +165,12 @@ def ask_gemini_for_noun():
         text = data["candidates"][0]["content"]["parts"][0]["text"]
         word = text.strip().split()[0].strip(".,!?\"'()«»").lower()
         return word if word else None
+    except requests.exceptions.HTTPError as e:
+        if resp is not None and resp.status_code == 429:
+            print("⚠️ Gemini rate limit ამოწურულია (429) — ვბრუნდებით fallback-ზე.")
+        else:
+            print(f"⚠️ Gemini-სთან დაკავშირება ჩავარდა: {e}")
+        return None
     except Exception as e:
         print(f"⚠️ Gemini-სთან დაკავშირება ჩავარდა: {e}")
         return None
@@ -171,11 +179,13 @@ def ask_gemini_for_noun():
 
 def pick_target_word():
     # ჯერ ვცდით Gemini-სგან სიტყვის მიღებას (თუ API key დაყენებულია)
-    for attempt in range(5):
+    for attempt in range(3):
         word = ask_gemini_for_noun()
         if word and word in word_vectors:
             print(f"🤖 Gemini-მ აირჩია სამიზნე სიტყვა: {word}")
             return word
+        if attempt < 2:
+            time.sleep(1.5)  # ვიცდით ცოტას, რომ rate limit არ დავარღვიოთ
 
     # fallback: თუ Gemini არ არის კონფიგურირებული, ან ვერცერთხელ
     # ვერ დააბრუნა ისეთი სიტყვა, რომელიც ვექტორებში მოიძებნება
