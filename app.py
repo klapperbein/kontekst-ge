@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from flask import Flask, request
+from flask import Flask, request, render_template
 from flask_socketio import SocketIO, join_room, emit
 
 app = Flask(__name__)
@@ -9,11 +9,9 @@ app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
 
 word_vectors = {}
-# დროებითი სამიზნე სიტყვა ტესტირებისთვის (თუ ოთახებზე გაქვს მიბმული, შეგიძლია შენი ლოგიკა დააბრუნო)
 CURRENT_TARGET_WORD = "მგელი" 
 
 def load_vectors():
-    # 🔴 აქ შევცვალეთ vectors.txt -> vectors.vec
     vector_file = "vectors.vec" 
     
     if not os.path.exists(vector_file):
@@ -43,7 +41,6 @@ def get_similarity(word1, word2):
     w1 = word1.strip().lower()
     w2 = word2.strip().lower()
     
-    # სადიაგნოსტიკო ლოგი - გამოჩნდება Railway-ს ლოგებში
     found_w1 = "მოიძებნა" if w1 in word_vectors else "ვერ მოიძებნა"
     found_w2 = "მოიძებნა" if w2 in word_vectors else "ვერ მოიძებნა"
     print(f"🔍 ვეძებთ: '{w1}' -> {found_w1} | სამიზნე: '{w2}' -> {found_w2}")
@@ -54,16 +51,18 @@ def get_similarity(word1, word2):
     v1 = word_vectors[w1]
     v2 = word_vectors[w2]
     
-    # Cosine similarity-ს გამოთვლა (ვექტორები უკვე ნორმალიზებულია load_vectors-ში)
     similarity = np.dot(v1, v2)
     
-    # ვაკონვერტირებთ 0-100 შკალაზე
     score = max(0.0, float(similarity) * 100)
     return round(score, 2)
 
 @app.route('/')
 def index():
-    return "Kontekst.ge სერვერი ჩართულია და მუშაობს!"
+    # ამოწმებს, არსებობს თუ არა HTML ფაილი templates ფოლდერში
+    if os.path.exists('templates/index.html'):
+        return render_template('index.html')
+    else:
+        return "Kontekst.ge სერვერი ჩართულია და მუშაობს! (HTML ფაილი 'templates/index.html' ვერ მოიძებნა)"
 
 @socketio.on('join_room')
 def handle_join_room(data):
@@ -78,7 +77,6 @@ def handle_guess(data):
     word = data.get('word', '')
     username = data.get('username', 'მოთამაშე')
     
-    # ვითვლით მსგავსებას შეყვანილ სიტყვასა და სამიზნე სიტყვას შორის
     score = get_similarity(word, CURRENT_TARGET_WORD)
     
     response = {
@@ -87,13 +85,11 @@ def handle_guess(data):
         'score': score
     }
     
-    # ვაგზავნით შედეგს კონკრეტულ ოთახში მყოფ ყველა მოთამაშესთან
     if room:
         emit('guess_result', response, to=room)
     else:
         emit('guess_result', response)
 
 if __name__ == '__main__':
-    # Railway იყენებს PORT ცვლადს, ამიტომ მისი წაკითხვა აუცილებელია
     port = int(os.environ.get("PORT", 5000))
     socketio.run(app, host='0.0.0.0', port=port)
