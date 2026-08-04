@@ -1,4 +1,4 @@
-import os
+\import os
 import random
 import string
 import requests
@@ -18,28 +18,46 @@ rooms = {}
 
 VECTOR_DIR = "/data" if os.path.exists("/data") else "."
 VECTOR_PATH = os.path.join(VECTOR_DIR, "vectors.vec")
+NOUNS_PATH = os.path.join(VECTOR_DIR, "nouns.txt")
 
-# ⚠️ ჩასვით აქ თქვენი Hugging Face-ის direct download ლინკი
+# ⚠️ ჩასვით აქ თქვენი Hugging Face-ის direct download ლინკები
 DOWNLOAD_URL = "https://huggingface.co/datasets/klapperbein/georgian-vectors/resolve/main/vectors.vec"
+NOUNS_DOWNLOAD_URL = "https://huggingface.co/datasets/klapperbein/georgian-vectors/resolve/main/nouns.txt"
 
 
-def download_vectors_if_needed():
-    if os.path.exists(VECTOR_PATH) and os.path.getsize(VECTOR_PATH) > 1000:
-        print(f"✅ ვექტორების ფაილი უკვე არსებობს: {VECTOR_PATH} — ჩამოტვირთვა არ სჭირდება.")
+def download_file_if_needed(path, url, label):
+    if os.path.exists(path) and os.path.getsize(path) > 100:
+        print(f"✅ {label} უკვე არსებობს: {path} — ჩამოტვირთვა არ სჭირდება.")
         return
 
-    print(f"⬇️ ვწერთ ვექტორების ფაილს {DOWNLOAD_URL}-დან...")
+    print(f"⬇️ ვწერთ {label}-ს {url}-დან...")
     try:
-        with requests.get(DOWNLOAD_URL, stream=True, timeout=600) as r:
+        with requests.get(url, stream=True, timeout=600) as r:
             r.raise_for_status()
             total = 0
-            with open(VECTOR_PATH, "wb") as f:
+            with open(path, "wb") as f:
                 for chunk in r.iter_content(chunk_size=8192):
                     f.write(chunk)
                     total += len(chunk)
-            print(f"✅ ჩამოტვირთვა დასრულდა: {total / (1024*1024):.1f} MB")
+            print(f"✅ {label} ჩამოტვირთვა დასრულდა: {total / (1024*1024):.2f} MB")
     except Exception as e:
-        print(f"❌ ვექტორების ჩამოტვირთვა ჩავარდა: {e}")
+        print(f"❌ {label}-ის ჩამოტვირთვა ჩავარდა: {e}")
+
+
+def download_vectors_if_needed():
+    download_file_if_needed(VECTOR_PATH, DOWNLOAD_URL, "ვექტორების ფაილი")
+
+
+def download_nouns_if_needed():
+    download_file_if_needed(NOUNS_PATH, NOUNS_DOWNLOAD_URL, "არსებითი სახელების სია")
+
+
+def load_nouns():
+    if not os.path.exists(NOUNS_PATH):
+        print("⚠️ nouns.txt ვერ მოიძებნა — გამოვიყენებთ ყველა სიტყვას (POS ფილტრის გარეშე).")
+        return None
+    with open(NOUNS_PATH, "r", encoding="utf-8") as f:
+        return {line.strip().lower() for line in f if line.strip()}
 
 
 def load_vectors():
@@ -65,13 +83,15 @@ def load_vectors():
 
 
 download_vectors_if_needed()
+download_nouns_if_needed()
 load_vectors()
+NOUN_SET = load_nouns()  # None თუ nouns.txt ვერ ჩამოიტვირთა
 
 # ==================== სამიზნე სიტყვების ავტომატური გენერაცია ====================
-# ხელით სიის დაწერის მაგივრად, ვირჩევთ სიტყვებს პირდაპირ ჩატვირთული
-# ვექტორებიდან. ვინაიდან ფაილი სიხშირის მიხედვითაა დალაგებული, ჯერ
-# ვტოვებთ ყველაზე ხშირ სიტყვებს (ხშირად ესენი კავშირები/ნაცვალსახელებია),
-# შემდეგ ვირჩევთ მხოლოდ სუფთა ქართულ, საკმარისი სიგრძის სიტყვებს.
+# ვირჩევთ სიტყვებს პირდაპირ ჩატვირთული ვექტორებიდან. ვინაიდან ფაილი
+# სიხშირის მიხედვითაა დალაგებული, ჯერ ვტოვებთ ყველაზე ხშირ სიტყვებს,
+# შემდეგ ვირჩევთ მხოლოდ სუფთა ქართულ, საკმარისი სიგრძის სიტყვებს,
+# რომლებიც ასევე NOUN_SET-შიც მოიძებნება (ანუ ნამდვილად არსებითი სახელია).
 
 TARGET_POOL_SIZE = 500     # რამდენი სამიზნე სიტყვა გვინდა სულ
 SKIP_TOP_N = 300           # რამდენი ყველაზე ხშირი სიტყვა გამოვტოვოთ
@@ -93,6 +113,8 @@ def build_target_word_pool():
             continue
         if not is_georgian_word(word):
             continue
+        if NOUN_SET is not None and word not in NOUN_SET:
+            continue
         pool.append(word)
         if len(pool) >= TARGET_POOL_SIZE:
             break
@@ -100,7 +122,8 @@ def build_target_word_pool():
 
 
 VALID_TARGET_WORDS = build_target_word_pool()
-print(f"🎯 სამიზნე სიტყვების პული აშენდა: {len(VALID_TARGET_WORDS)} სიტყვა.")
+print(f"🎯 სამიზნე სიტყვების პული აშენდა: {len(VALID_TARGET_WORDS)} სიტყვა "
+      f"({'POS ფილტრით' if NOUN_SET is not None else 'POS ფილტრის გარეშე'}).")
 
 if not VALID_TARGET_WORDS:
     print("⚠️ პული ცარიელია! ვიყენებთ fallback-ს.")
@@ -108,7 +131,55 @@ if not VALID_TARGET_WORDS:
 # ================================================================================
 
 
+# ==================== Gemini AI-ს დახმარებით სამიზნე სიტყვის არჩევა ====================
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = "gemini-2.5-pro"
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+
+
+def ask_gemini_for_noun():
+    if not GEMINI_API_KEY:
+        return None
+
+    prompt = (
+        "დამისახელე ერთი ჩვეულებრივი, კონკრეტული ქართული არსებითი სახელი "
+        "(არა საკუთარი სახელი, არა აბსტრაქტული ცნება, არა ზმნა). "
+        "უპასუხე მხოლოდ ერთი სიტყვით, ქართული ანბანით, "
+        "პუნქტუაციის, ახსნის ან სხვა ტექსტის გარეშე."
+    )
+
+    try:
+        resp = requests.post(
+            GEMINI_URL,
+            params={"key": GEMINI_API_KEY},
+            json={
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"temperature": 1.2, "maxOutputTokens": 10},
+            },
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        text = data["candidates"][0]["content"]["parts"][0]["text"]
+        word = text.strip().split()[0].strip(".,!?\"'()«»").lower()
+        return word if word else None
+    except Exception as e:
+        print(f"⚠️ Gemini-სთან დაკავშირება ჩავარდა: {e}")
+        return None
+# ================================================================================
+
+
 def pick_target_word():
+    # ჯერ ვცდით Gemini-სგან სიტყვის მიღებას (თუ API key დაყენებულია)
+    for attempt in range(5):
+        word = ask_gemini_for_noun()
+        if word and word in word_vectors:
+            print(f"🤖 Gemini-მ აირჩია სამიზნე სიტყვა: {word}")
+            return word
+
+    # fallback: თუ Gemini არ არის კონფიგურირებული, ან ვერცერთხელ
+    # ვერ დააბრუნა ისეთი სიტყვა, რომელიც ვექტორებში მოიძებნება
+    print("↩️ ვბრუნდებით ლოკალურ სიტყვების პულზე (Gemini ვერ დაგვეხმარა).")
     return random.choice(VALID_TARGET_WORDS)
 
 
