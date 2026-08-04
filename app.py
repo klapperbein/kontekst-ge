@@ -158,8 +158,7 @@ def ask_gemini_for_noun():
                 "contents": [{"parts": [{"text": prompt}]}],
                 "generationConfig": {
                     "temperature": 1.2,
-                    "maxOutputTokens": 50,
-                    "thinkingConfig": {"thinkingBudget": 0},
+                    "maxOutputTokens": 300,
                 },
             },
             timeout=15,
@@ -179,10 +178,11 @@ def ask_gemini_for_noun():
         word = text.strip().split()[0].strip(".,!?\"'()«»").lower() if text.strip() else None
         return word
     except requests.exceptions.HTTPError as e:
+        body = resp.text if resp is not None else "(no response)"
         if resp is not None and resp.status_code == 429:
             print("⚠️ Gemini rate limit ამოწურულია (429) — ვბრუნდებით fallback-ზე.")
         else:
-            print(f"⚠️ Gemini-სთან დაკავშირება ჩავარდა: {e}")
+            print(f"⚠️ Gemini-სთან დაკავშირება ჩავარდა: {e} | პასუხის ტექსტი: {body}")
         return None
     except Exception as e:
         print(f"⚠️ Gemini-სთან დაკავშირება ჩავარდა: {e}")
