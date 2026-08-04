@@ -1,75 +1,52 @@
 import os
 import numpy as np
-from flask import Flask, request, render_template
+from flask import Flask, render_template
 from flask_socketio import SocketIO, join_room, emit
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
-# gevent აუცილებელია Railway-ზე SocketIO-ს სტაბილური მუშაობისთვის
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
 
 word_vectors = {}
 CURRENT_TARGET_WORD = "მგელი" 
+VECTOR_FILE = "vectors.vec"
 
 def load_vectors():
-    vector_file = "vectors.vec" 
-    
-    if not os.path.exists(vector_file):
-        print(f"⚠️ გაფრთხილება: {vector_file} ვერ მოიძებნა ძირ დირექტორიაში!")
+    if not os.path.exists(VECTOR_FILE):
+        print(f"⚠️ {VECTOR_FILE} ფაილი ვერ მოიძებნა!")
         return
 
-    print("🚀 იტვირთება ქართული ენის ოპტიმიზებული მოდელი...")
-    try:
-        with open(vector_file, "r", encoding="utf-8") as f:
-            first_line = f.readline()
-            for line in f:
-                parts = line.rstrip().split(" ")
-                if len(parts) > 1:
-                    word = parts[0].strip().lower()
-                    vector = np.array([float(x) for x in parts[1:]], dtype=np.float32)
-                    norm = np.linalg.norm(vector)
-                    if norm > 0:
-                        word_vectors[word] = vector / norm
-        print(f"✅ მოდელი წარმატებით ჩაიტვირთა! სულ დაემატა: {len(word_vectors)} სიტყვა.")
-    except Exception as e:
-        print(f"❌ შეცდომა მოდელის ჩატვირთვისას: {e}")
+    with open(VECTOR_FILE, "r", encoding="utf-8") as f:
+        next(f) # პირველი, საინფორმაციო ხაზის გამოტოვება
+        for line in f:
+            parts = line.rstrip().split(" ")
+            if len(parts) > 1:
+                word = parts[0].strip().lower()
+                vector = np.array(parts[1:], dtype=np.float32)
+                norm = np.linalg.norm(vector)
+                if norm > 0:
+                    word_vectors[word] = vector / norm
+    print(f"✅ მოდელი ჩაიტვირთა: {len(word_vectors)} სიტყვა.")
 
-# ვტვირთავთ მოდელს სერვერის ჩართვისას
 load_vectors()
 
-def get_similarity(word1, word2):
-    w1 = word1.strip().lower()
-    w2 = word2.strip().lower()
-    
-    found_w1 = "მოიძებნა" if w1 in word_vectors else "ვერ მოიძებნა"
-    found_w2 = "მოიძებნა" if w2 in word_vectors else "ვერ მოიძებნა"
-    print(f"🔍 ვეძებთ: '{w1}' -> {found_w1} | სამიზნე: '{w2}' -> {found_w2}")
+def get_similarity(w1, w2):
+    w1, w2 = w1.strip().lower(), w2.strip().lower()
     
     if w1 not in word_vectors or w2 not in word_vectors:
         return 0.0
         
-    v1 = word_vectors[w1]
-    v2 = word_vectors[w2]
-    
-    similarity = np.dot(v1, v2)
-    
-    score = max(0.0, float(similarity) * 100)
-    return round(score, 2)
+    similarity = np.dot(word_vectors[w1], word_vectors[w2])
+    return round(max(0.0, float(similarity) * 100), 2)
 
 @app.route('/')
 def index():
-    # ამოწმებს, არსებობს თუ არა HTML ფაილი templates ფოლდერში
-    if os.path.exists('templates/index.html'):
-        return render_template('index.html')
-    else:
-        return "Kontekst.ge სერვერი ჩართულია და მუშაობს! (HTML ფაილი 'templates/index.html' ვერ მოიძებნა)"
+    return render_template('index.html')
 
 @socketio.on('join_room')
 def handle_join_room(data):
-    room = data.get('room')
-    if room:
+    if room := data.get('room'):
         join_room(room)
-        print(f"👤 მომხმარებელი შეუერთდა ოთახს: {room}")
 
 @socketio.on('guess_word')
 def handle_guess(data):
@@ -78,12 +55,7 @@ def handle_guess(data):
     username = data.get('username', 'მოთამაშე')
     
     score = get_similarity(word, CURRENT_TARGET_WORD)
-    
-    response = {
-        'username': username,
-        'word': word,
-        'score': score
-    }
+    response = {'username': username, 'word': word, 'score': score}
     
     if room:
         emit('guess_result', response, to=room)
@@ -91,5 +63,4 @@ def handle_guess(data):
         emit('guess_result', response)
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    socketio.run(app, host='0.0.0.0', port=port)
+    socketio.run(app, host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
