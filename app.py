@@ -156,15 +156,28 @@ def ask_gemini_for_noun():
             params={"key": GEMINI_API_KEY},
             json={
                 "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": 1.2, "maxOutputTokens": 10},
+                "generationConfig": {
+                    "temperature": 1.2,
+                    "maxOutputTokens": 50,
+                    "thinkingConfig": {"thinkingBudget": 0},
+                },
             },
             timeout=15,
         )
         resp.raise_for_status()
         data = resp.json()
-        text = data["candidates"][0]["content"]["parts"][0]["text"]
-        word = text.strip().split()[0].strip(".,!?\"'()«»").lower()
-        return word if word else None
+        candidates = data.get("candidates", [])
+        if not candidates:
+            print(f"⚠️ Gemini-მ ცარიელი candidates დააბრუნა: {data}")
+            return None
+        parts = candidates[0].get("content", {}).get("parts", [])
+        if not parts:
+            print(f"⚠️ Gemini-ის პასუხს parts არ ჰქონდა (finishReason: "
+                  f"{candidates[0].get('finishReason')}): {data}")
+            return None
+        text = parts[0].get("text", "")
+        word = text.strip().split()[0].strip(".,!?\"'()«»").lower() if text.strip() else None
+        return word
     except requests.exceptions.HTTPError as e:
         if resp is not None and resp.status_code == 429:
             print("⚠️ Gemini rate limit ამოწურულია (429) — ვბრუნდებით fallback-ზე.")
